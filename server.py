@@ -1,7 +1,14 @@
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+
+from marker.converters.pdf import PdfConverter
+import io
+import contextlib
+from marker.models import create_model_dict
+from marker.output import text_from_rendered
 
 from mcp.server.fastmcp import FastMCP
 
@@ -399,6 +406,7 @@ def edit_file(
             "line_operations_performed": []
         }
 
+
 @mcp.tool(
     description="""
     Write content to a file with options to append or overwrite existing content.
@@ -423,3 +431,57 @@ def write_file(file_path: Path, content: str, mode: str = "w") -> dict:
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+@mcp.tool(
+    description="""
+    Fetch a web page by converting it to PDF and then extracting text.
+    
+    This tool fetches a web page by converting it to PDF using Chromium and then extracts the text content.
+    
+    Parameters:
+    - url: URL of the web page to fetch
+    
+    Returns the extracted text content of the web page.
+    """
+)
+def fetch_page(url: str) -> str:
+    """
+    Fetch a web page by converting it to PDF and then extracting text.
+    Utilizes a temporary file and suppresses any stdout produced by the PDF converter.
+    """
+    # Create a named temporary file and immediately close it so Chromium can write to it.
+    with tempfile.NamedTemporaryFile(prefix="page", suffix=".pdf", delete=False) as tmp_pdf:
+        temp_pdf_path = tmp_pdf.name
+
+    try:
+        # Build the command for Chromium to convert the page to PDF.
+        command = [
+            "chromium",
+            "--headless",
+            "--disable-gpu",
+            f"--print-to-pdf={temp_pdf_path}",
+            url
+        ]
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        if result.returncode != 0:
+            return f"Error fetching page: {result.stderr}"
+
+        with io.StringIO() as buf, contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            converter = PdfConverter(artifact_dict=create_model_dict())
+            rendered = converter(temp_pdf_path)
+            text, _, images = text_from_rendered(rendered)
+        return text
+
+    finally:
+        try:
+            Path(temp_pdf_path).unlink()
+        except Exception:
+            pass
+

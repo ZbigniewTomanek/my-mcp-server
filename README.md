@@ -46,6 +46,29 @@ MCP follows a client-server architecture:
 4. Run `which uv` to get an absolute path to the `uv` executable
 5. Update your MCP server configuration in Claude Desktop to use the absolute path to the `uv` executable
 
+My MCP server configuration looks like this:
+
+```json
+{
+  "globalShortcut": "",
+  "mcpServers": {
+    "zbigniew-mcp": {
+      "command": "/Users/zbigniewtomanek/.local/bin/uv",
+      "args": [
+        "run",
+        "--with",
+        "mcp[cli]",
+        "--with",
+        "marker-pdf",
+        "mcp",
+        "run",
+        "/Users/zbigniewtomanek/PycharmProjects/my-mcp-tools/server.py"
+      ]
+    }
+  }
+}
+```
+
 
 ## Usage
 
@@ -116,6 +139,14 @@ write_file("/path/to/file.txt", "New content")
 
 # Append to file
 write_file("/path/to/log.txt", "Log entry", mode="a")
+```
+
+### fetch_page
+
+Fetch the contents of a web page to a PDF (requires chromium installed) and then parses it to markdown using local LLMs:
+
+```python
+fetch_page("https://example.com")
 ```
 
 ## Transport Mechanisms
